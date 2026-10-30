@@ -84,6 +84,8 @@ Error handler juga sudah otomatis mengubah error Prisma: **P2002** (data unik be
 
 `metadata` hanya untuk endpoint dengan pagination. Isi `message` boleh berbeda asal jelas.
 
+Bentuk `data` setiap endpoint di bawah diambil dari **gambar contoh di soal**. Angka di beberapa gambar soal (misalnya id atau saldo) berbeda dengan testcase karena diambil di kondisi database yang lain. Yang menjadi patokan angka adalah kolom "Hasil yang benar" di tabel testcase.
+
 ---
 
 ## 3. Tugas B — Katalog (Hero & Skin) + README
@@ -107,9 +109,22 @@ Router sudah terpasang oleh A di `/api/heroes` dan `/api/skins`, jadi di file ro
 - Query `search`: nama hero mengandung kata itu, tidak peduli huruf besar/kecil (`contains` + `mode: "insensitive"`).
 - Query `role` (contoh `MARKSMAN`): **validasi dulu** terhadap nilai enum `Role`. Kalau tidak dicek, nilai asal-asalan seperti `role=ngawur` akan membuat Prisma error 500.
 - Ambil data dan total sekaligus dengan `prisma.$transaction([findMany, count])`. Contohnya ada di `CLAUDE.md` bagian A4.
+- Urutkan berdasarkan `id` naik.
+- Contoh response (`?role=MARKSMAN&limit=5`):
+  ```json
+  {
+    "status": true,
+    "message": "Berhasil mengambil data hero",
+    "data": [
+      { "id": 1, "name": "Miya", "role": "MARKSMAN", "lane": "GOLD", "releaseYear": 2016, "priceBP": 10800, "priceDiamond": 399 },
+      { "id": 12, "name": "Bruno", "...": "..." }
+    ],
+    "metadata": { "currentPage": 1, "limit": 5, "totalItems": 20, "totalPages": 4 }
+  }
+  ```
 
 **`GET /api/heroes/:hero_id`**
-- Tampilkan hero beserta skin-nya (`include: { skins: true }`).
+- Tampilkan hero beserta skin-nya (`include: { skins: true }`). Hasilnya: semua kolom hero ditambah array `skins`.
 - Hero tidak ada → 404.
 
 **`POST /api/heroes`**
@@ -117,13 +132,26 @@ Router sudah terpasang oleh A di `/api/heroes` dan `/api/skins`, jadi di file ro
 - Urutan pemeriksaan:
   1. `name`, `role`, `lane`, atau `releaseYear` kosong → 400
   2. Nama hero sudah ada → 409
-  3. Berhasil → 201 berisi hero baru
+  3. Berhasil → 201 berisi hero baru (semua kolom hero, termasuk `id`)
 
 ### Fitur 3: Skin
 
 **`GET /api/skins`**
-- Sertakan nama hero: `include: { hero: { select: { id: true, name: true } } }`.
+- Sertakan nama hero: `include: { hero: { select: { name: true } } }`.
 - Query `page`, `limit`, `heroId` (contoh `18`), `rarity` (contoh `GRAND`, validasi terhadap enum `Rarity`).
+- Urutkan berdasarkan `id` naik.
+- Contoh response (`?heroId=18`):
+  ```json
+  {
+    "status": true,
+    "message": "Berhasil mengambil data skin",
+    "data": [
+      { "id": 25, "name": "Green Flash", "rarity": "COMMON", "priceDiamond": 269, "heroId": 18, "hero": { "name": "Layla" } },
+      { "id": 33, "name": "Bunny Babe", "rarity": "EXCEPTIONAL", "priceDiamond": null, "heroId": 18, "hero": { "name": "Layla" } }
+    ],
+    "metadata": { "currentPage": 1, "limit": 10, "totalItems": 11, "totalPages": 2 }
+  }
+  ```
 
 **`GET /api/skins/:skin_id`**
 - Tampilkan skin beserta hero-nya.
@@ -167,10 +195,37 @@ Router sudah terpasang oleh A di `/api/players` dan `/api/statistics`. **Jangan*
 **`POST /api/players`**
 - Body hanya `nickname`. Saldo otomatis 10000 BP dan 0 Diamond dari default schema, jadi **jangan** diisi manual.
 - `nickname` kosong → 400, sudah dipakai → 409, berhasil → 201.
+- Contoh response:
+  ```json
+  {
+    "status": true,
+    "message": "Player berhasil dibuat",
+    "data": { "id": 4, "nickname": "JunglerMalam", "bp": 10000, "diamond": 0, "createdAt": "2026-10-31T04:28:06.547Z" }
+  }
+  ```
 
 **`GET /api/players/:player_id`**
-- Tampilkan player beserta hero miliknya: `include: { heroes: { include: { hero: true } } }`.
+- Ambil player beserta hero miliknya: `include: { heroes: { include: { hero: true } } }`.
+- **Penting:** hasil `include` itu masih bersarang. Ubah dulu `heroes` dengan `.map(...)` menjadi bentuk datar seperti contoh di bawah (`heroId`, `name`, `currency`, `pricePaid`) sebelum dikirim.
 - Player tidak ada → 404.
+- Contoh response (testcase 22, setelah player 3 membeli Freya dan Layla):
+  ```json
+  {
+    "status": true,
+    "message": "Berhasil mengambil data player",
+    "data": {
+      "id": 3,
+      "nickname": "MageSurabaya",
+      "bp": 8300,
+      "diamond": 107,
+      "createdAt": "2026-10-31T04:24:24.200Z",
+      "heroes": [
+        { "heroId": 22, "name": "Freya", "currency": "DIAMOND", "pricePaid": 599 },
+        { "heroId": 18, "name": "Layla", "currency": "BP", "pricePaid": 2000 }
+      ]
+    }
+  }
+  ```
 
 **`PATCH /api/players/:player_id`**
 - Ganti `nickname`.
@@ -187,12 +242,20 @@ Router sudah terpasang oleh A di `/api/players` dan `/api/statistics`. **Jangan*
   1. `amount` bukan bilangan bulat lebih dari 0 → 400 (pakai `Number.isInteger`)
   2. Player tidak ada → 404
   3. Berhasil → 200. Tambah saldo dengan `diamond: { increment: amount }`, lalu kirim saldo Diamond terbaru.
+- Contoh response (testcase 14):
+  ```json
+  { "status": true, "message": "Top up berhasil", "data": { "playerId": 3, "amount": 706, "diamond": 706 } }
+  ```
 
 **`POST /api/players/:player_id/matches`**
 - Body `result` (`WIN` atau `LOSE`). Urutan pemeriksaan:
   1. `result` bukan `WIN`/`LOSE` → 400
   2. Player tidak ada → 404
   3. Berhasil → 200. `bp: { increment: ... }` dengan WIN +300 dan LOSE +100, lalu kirim BP yang didapat dan saldo BP terbaru.
+- Contoh response (testcase 16):
+  ```json
+  { "status": true, "message": "Hadiah match berhasil ditambahkan", "data": { "playerId": 3, "result": "WIN", "bpEarned": 300, "bp": 10300 } }
+  ```
 
 ### Fitur 7: Statistik
 
@@ -204,7 +267,32 @@ Router sudah terpasang oleh A di `/api/players` dan `/api/statistics`. **Jangan*
 | `totalHeroesOwned` | Jumlah baris PlayerHero | `prisma.playerHero.count()` |
 | `totalDiamond` | Total saldo Diamond semua player | `aggregate` dengan `_sum: { diamond: true }` |
 | `mostOwnedHero` | Hero paling banyak dimiliki + jumlah pemiliknya | `groupBy` PlayerHero berdasarkan `heroId`, urutkan `_count` terbesar, ambil 1, lalu cari nama hero-nya |
-| `heroesPerRole` | Jumlah hero per role | `groupBy` Hero berdasarkan `role` |
+| `heroesPerRole` | Jumlah hero per role | `groupBy` Hero berdasarkan `role`, urutkan dari jumlah terbanyak |
+
+Hasil `groupBy` perlu diubah dengan `.map(...)` supaya bentuknya sama dengan contoh. Contoh response testcase 25 (setelah testcase 01–24 dijalankan berurutan dari seed baru):
+
+```json
+{
+  "status": true,
+  "message": "Berhasil mengambil statistik",
+  "data": {
+    "totalPlayers": 4,
+    "totalHeroesOwned": 6,
+    "totalDiamond": 3074,
+    "mostOwnedHero": { "heroId": 18, "name": "Layla", "owners": 2 },
+    "heroesPerRole": [
+      { "role": "FIGHTER", "total": 37 },
+      { "role": "MAGE", "total": 26 },
+      { "role": "ASSASSIN", "total": 20 },
+      { "role": "MARKSMAN", "total": 20 },
+      { "role": "TANK", "total": 18 },
+      { "role": "SUPPORT", "total": 13 }
+    ]
+  }
+}
+```
+
+Angka di atas dihitung dari urutan testcase: 4 player (3 seed + JunglerMalam), 6 PlayerHero (4 seed + Freya + Layla milik player 3), Diamond 75 + 2892 + 107 + 0, Layla dimiliki player 1 dan 3, dan MAGE menjadi 26 karena Collie ditambahkan di testcase 06. Angka di gambar soal berbeda karena diambil di kondisi database lain. Bentuk JSON-nya yang harus sama.
 
 ### Testcase Postman yang harus lolos (C)
 
@@ -218,7 +306,7 @@ Router sudah terpasang oleh A di `/api/players` dan `/api/statistics`. **Jangan*
 | 22 | `GET /api/players/3` | 200, punya Freya dan Layla (setelah A7 selesai) |
 | 23 | `PATCH /api/players/3` (MageITS) | 200 |
 | 24 | `PATCH /api/players/3` (ArekITS) | 409 |
-| 25 | `GET /api/statistics` | 200, sesuai gambar Fitur 7 di soal |
+| 25 | `GET /api/statistics` | 200, sesuai contoh response Fitur 7 di atas |
 | 26 | `DELETE /api/players/4` | 200 |
 | 27 | `GET /api/players/4` | 404 |
 
