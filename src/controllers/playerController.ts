@@ -43,3 +43,25 @@ export const getPlayerById = async (req: Request, res: Response): Promise<void> 
 
   sendSuccess(res, 200, "Berhasil mengambil data player", data);
 };
+
+export const updatePlayer = async (req: Request, res: Response): Promise<void> => {
+  const id = parseId(req.params.player_id);
+
+  const existingPlayer = await prisma.player.findUnique({ where: { id } });
+  if (!existingPlayer) {
+    throw new HttpError(404, "Player tidak ditemukan");
+  }
+
+  const body = req.body ?? {};
+  const nickname = typeof body.nickname === "string" ? body.nickname.trim() : "";
+  if (!nickname) {
+    throw new HttpError(400, "Nickname tidak boleh kosong");
+  }
+
+  const player = await prisma.player.update({
+    where: { id },
+    data: { nickname },
+  });
+
+  sendSuccess(res, 200, "Player berhasil diperbarui", player);
+};
