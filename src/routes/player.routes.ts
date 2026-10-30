@@ -1,7 +1,10 @@
 // src/routes/player.routes.ts (C)
 import { Router } from "express";
+import { createPlayer } from "../controllers/playerController";
 
 const router = Router();
+
+router.post("/", createPlayer);
 
 // Didaftarkan di /api/players. Isi oleh C:
 // POST   /                    -> createPlayer
