@@ -88,7 +88,7 @@ pweb-express-c08-2026/
 
 ### Aturan kerja bersama
 
-1. Satu repo GitHub milik kelompok. Setiap orang bekerja di branch sendiri: `feat/fondasi` (A), `feat/katalog` (B), `feat/player` (C).
+1. Satu repo GitHub milik kelompok. Setiap orang bekerja di branch sendiri: `feat/part-a` (A, satu branch untuk semua langkah A1 sampai A8), `feat/katalog` (B), `feat/player` (C). Branch `feat/fondasi` hanya berisi kerangka file kosong dan tidak dipakai lagi.
 2. B dan C membuat Pull Request ke `main`. **Hanya A yang merge**, setelah mencoba PR di laptopnya sendiri.
 3. Semua memakai database Neon yang sama. Isi `.env` dibagikan A lewat chat pribadi.
 4. Migrasi hanya dijalankan oleh A. B dan C cukup menjalankan `npx prisma generate` setiap habis pull.
