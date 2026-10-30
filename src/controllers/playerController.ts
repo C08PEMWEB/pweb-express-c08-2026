@@ -65,3 +65,19 @@ export const updatePlayer = async (req: Request, res: Response): Promise<void> =
 
   sendSuccess(res, 200, "Player berhasil diperbarui", player);
 };
+
+export const deletePlayer = async (req: Request, res: Response): Promise<void> => {
+  const id = parseId(req.params.player_id);
+
+  const existingPlayer = await prisma.player.findUnique({ where: { id } });
+  if (!existingPlayer) {
+    throw new HttpError(404, "Player tidak ditemukan");
+  }
+
+  await prisma.player.delete({ where: { id } });
+
+  sendSuccess(res, 200, "Player berhasil dihapus", {
+    id: existingPlayer.id,
+    nickname: existingPlayer.nickname,
+  });
+};
