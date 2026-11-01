@@ -81,3 +81,57 @@ export const deletePlayer = async (req: Request, res: Response): Promise<void> =
     nickname: existingPlayer.nickname,
   });
 };
+
+export const topUp = async (req: Request, res: Response): Promise<void> => {
+  const id = parseId(req.params.player_id);
+
+  const body = req.body ?? {};
+  const amount = body.amount;
+  if (!Number.isInteger(amount) || amount <= 0) {
+    throw new HttpError(400, "Amount harus berupa bilangan bulat lebih dari 0");
+  }
+
+  const player = await prisma.player.findUnique({ where: { id } });
+  if (!player) {
+    throw new HttpError(404, "Player tidak ditemukan");
+  }
+
+  const updatedPlayer = await prisma.player.update({
+    where: { id },
+    data: { diamond: { increment: amount } },
+  });
+
+  sendSuccess(res, 200, "Top up berhasil", {
+    playerId: id,
+    amount,
+    diamond: updatedPlayer.diamond,
+  });
+};
+
+export const playMatch = async (req: Request, res: Response): Promise<void> => {
+  const id = parseId(req.params.player_id);
+
+  const body = req.body ?? {};
+  const result = body.result;
+  if (result !== "WIN" && result !== "LOSE") {
+    throw new HttpError(400, "Result harus WIN atau LOSE");
+  }
+
+  const player = await prisma.player.findUnique({ where: { id } });
+  if (!player) {
+    throw new HttpError(404, "Player tidak ditemukan");
+  }
+
+  const bpEarned = result === "WIN" ? 300 : 100;
+  const updatedPlayer = await prisma.player.update({
+    where: { id },
+    data: { bp: { increment: bpEarned } },
+  });
+
+  sendSuccess(res, 200, "Hadiah match berhasil ditambahkan", {
+    playerId: id,
+    result,
+    bpEarned,
+    bp: updatedPlayer.bp,
+  });
+};
