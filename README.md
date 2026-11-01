@@ -1,9 +1,5 @@
 # MLBB Shop API
 
-| Maulana Zaki Putra Zakaria | Fondasi project, middleware, Beli Hero |
-| Iqbal Rizki Muhammad Fadhli | Hero, Skin, README |
-| Keisya Dira Anugerah | Player, Top Up dan Match, Statistik |
-
 Backend sederhana untuk toko Mobile Legends, dibuat untuk Praktikum Modul 4 (Pemrograman Web) — **Kelompok C08**.
 
 Player memiliki dua mata uang, **Diamond** (dari top up) dan **Battle Point / BP** (dari match). Keduanya bisa dipakai untuk membeli hero. Skin hanya ditampilkan sebagai katalog (tidak bisa dibeli). Project ini hanya backend, tanpa frontend dan tanpa login/JWT.
@@ -99,17 +95,27 @@ Gagal:
 ### Player
 | Method | Endpoint | Keterangan |
 |---|---|---|
-| POST | `/api/players` | Buat player. Body: `nickname` |
-| GET | `/api/players/:player_id` | Detail player beserta hero yang dimiliki |
-| PATCH | `/api/players/:player_id` | Ganti nickname |
-| DELETE | `/api/players/:player_id` | Hapus player (data hero miliknya ikut terhapus) |
+| POST | `/api/players` | Buat player. Body: `nickname`. Saldo awal 10000 BP dan 0 Diamond. 400 jika kosong, 409 jika sudah dipakai |
+| GET | `/api/players/:player_id` | Detail player beserta hero yang dimiliki. 404 jika tidak ada |
+| PATCH | `/api/players/:player_id` | Ganti nickname. 404 jika player tidak ada, 400 jika kosong, 409 jika dipakai player lain |
+| DELETE | `/api/players/:player_id` | Hapus player (data hero miliknya ikut terhapus). 404 jika tidak ada |
 
 ### Top Up, Match, dan Beli Hero
 | Method | Endpoint | Keterangan |
 |---|---|---|
 | POST | `/api/players/:player_id/topup` | Tambah Diamond. Body: `amount` (bilangan bulat > 0) |
 | POST | `/api/players/:player_id/matches` | Hadiah BP. Body: `result` (`WIN` +300, `LOSE` +100) |
-| POST | `/api/players/:player_id/heroes` | Beli hero. Body: `heroId`, `currency` (`BP` atau `DIAMOND`) |
+| POST | `/api/players/:player_id/heroes` | Beli hero. Body: `heroId`, `currency` (`BP` atau `DIAMOND`). Saldo dikurangi dan hero dicatat dalam satu `$transaction` |
+
+Urutan pemeriksaan Beli Hero (berhenti di yang pertama gagal):
+
+1. `heroId` kosong atau `currency` bukan `BP`/`DIAMOND` → 400
+2. Player tidak ditemukan → 404
+3. Hero tidak ditemukan → 404
+4. Harga hero untuk mata uang itu kosong (contoh: Freya tidak punya harga BP) → 400
+5. Player sudah memiliki hero itu → 409
+6. Saldo kurang dari harga → 400
+7. Berhasil → 201 berisi hero, mata uang, harga, dan saldo `bp`/`diamond` terbaru
 
 ### Statistik
 | Method | Endpoint | Keterangan |
@@ -134,10 +140,19 @@ curl -X POST http://localhost:3000/api/heroes \
   -d '{"name":"Collie","role":"MAGE","lane":"MID","releaseYear":2026,"priceBP":32000,"priceDiamond":599}'
 ```
 
+## Pengujian
+
+1. Seed ulang database supaya data kembali ke kondisi awal:
+   ```bash
+   npx tsx prisma/seed.ts
+   ```
+2. Import `mlbb-shop-testcase.postman_collection.json` ke Postman.
+3. Jalankan testcase 01 sampai 28 **berurutan** (klik kanan collection, pilih **Run collection**). Urutan penting, karena testcase berikutnya memakai hasil sebelumnya (contoh: Beli Freya butuh Diamond dari Top Up).
+
 ## Anggota Kelompok C08
 
 | Nama | Bagian |
 |---|---|
-| (isi nama A) | Fondasi project, middleware, Beli Hero |
-| (isi nama B) | Hero, Skin, README |
-| (isi nama C) | Player, Top Up dan Match, Statistik |
+| Maulana Zaki Putra Zakaria | Fondasi project (schema, migrasi, seed), middleware, Beli Hero |
+| Iqbal Rizki Muhammad Fadhli | Hero, Skin, README |
+| Keisya Dira Anugerah | Player, Top Up dan Match, Statistik |
